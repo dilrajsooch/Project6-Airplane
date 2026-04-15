@@ -143,6 +143,11 @@ static void clientThread(SOCKET clientSocket)
     setsockopt(clientSocket, SOL_SOCKET, SO_KEEPALIVE,
         reinterpret_cast<char*>(&keepAlive), sizeof(keepAlive));
 
+    // UPDATED CODE: Reduce keepalive timer from default 2 hours to 10 seconds
+    DWORD timeout = 10000;
+    setsockopt(clientSocket, SOL_SOCKET, SO_RCVTIMEO,
+        reinterpret_cast<char*>(&timeout), sizeof(timeout));
+
     TelemetryPacket pkt;
     int             bytesExpected = static_cast<int>(sizeof(TelemetryPacket));
     bool            identified = false;
