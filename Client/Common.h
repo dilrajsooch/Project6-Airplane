@@ -39,3 +39,30 @@ struct TelemetryPacket
     uint8_t  isEOF;                 
 };
 #pragma pack(pop)
+
+/* 
+*   Convert a telemetry timestamp string to a POSIX time_t.
+*   Handles the format produced by the data files:
+* @param ts  Null-terminated timestamp string.
+* @return   Corresponding time_t, or (time_t)-1 on parse failure.
+*/
+inline time_t parseTimestamp(const char* ts)
+{
+    int p1 = 0, p2 = 0, year = 0, hour = 0, min = 0, sec = 0;
+    if (std::sscanf(ts, "%d_%d_%d %d:%d:%d",
+        &p1, &p2, &year, &hour, &min, &sec) != 6)
+    {
+        return (time_t)-1;
+    }
+
+    // The data files use D_M_YYYY ordering; treat p1=day, p2=month.
+    struct tm t = {};
+    t.tm_mday = p1;
+    t.tm_mon = p2 - 1;          // tm_mon is 0-based
+    t.tm_year = year - 1900;
+    t.tm_hour = hour;
+    t.tm_min = min;
+    t.tm_sec = sec;
+    t.tm_isdst = -1;              // let the C runtime figure out DST
+    return std::mktime(&t);
+}
