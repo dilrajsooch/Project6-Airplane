@@ -1,0 +1,4 @@
+echo .vs/ > .gitignore
+echo x64/ >> .gitignore
+echo Debug/ >> .gitignore
+echo *.user >> .gitignore
