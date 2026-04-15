@@ -90,3 +90,22 @@ static bool parseLine(const std::string& line,
     }
     return true;
 }
+
+//Reliable Send
+
+/*
+ * Send all bytes in the buffer, looping until complete.
+ * @return true on success, false if the connection was lost.
+ */
+static bool sendAll(SOCKET s, const char* buf, int len)
+{
+    int sent = 0;
+    while (sent < len)
+    {
+        int n = send(s, buf + sent, len - sent, 0);
+        if (n == SOCKET_ERROR || n == 0)
+            return false;
+        sent += n;
+    }
+    return true;
+}
