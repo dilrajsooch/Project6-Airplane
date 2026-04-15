@@ -30,19 +30,18 @@ static uint32_t generateClientID()
     return id;
 }
 
-// ─── Telemetry File Parser ─────────────────────────────────────────────────────
+//Telemetry File Parser
+/*
+    Parse one line of a telemetry data file.
+ 
+    Two line formats are handled:
+    Header:"FUEL TOTAL QUANTITY,D_M_YYYY HH:MM:SS,fuel,"
+    Data:  D_M_YYYY HH:MM:SS,fuel,"
+ 
+    Output: null-terminated timestamp string.
+    Output: fuel quantity (gallons).
+    Return true on success, false if the line could not be parsed.
 
-/**
- * Parse one line of a telemetry data file.
- *
- * Two line formats are handled:
- *   Header:    "FUEL TOTAL QUANTITY,D_M_YYYY HH:MM:SS,fuel,"
- *   Data:      " D_M_YYYY HH:MM:SS,fuel,"
- *
- * @param line      Raw line string.
- * @param outTS     Output: null-terminated timestamp string.
- * @param outFuel   Output: fuel quantity (gallons).
- * @return true on success, false if the line could not be parsed.
  */
 static bool parseLine(const std::string& line,
     char               outTS[TIMESTAMP_LEN],
@@ -94,8 +93,8 @@ static bool parseLine(const std::string& line,
 //Reliable Send
 
 /*
- * Send all bytes in the buffer, looping until complete.
- * @return true on success, false if the connection was lost.
+    Send all bytes in the buffer, looping until complete.
+    @return true on success, false if the connection was lost.
  */
 static bool sendAll(SOCKET s, const char* buf, int len)
 {
@@ -109,9 +108,6 @@ static bool sendAll(SOCKET s, const char* buf, int len)
     }
     return true;
 }
-
-
-//dil TODO
 
 int main(int argc, char* argv[])
 {
@@ -182,7 +178,6 @@ bool        connectionOK = true;
 while (connectionOK)
 {
     // rewind to start of file for each loop it
-    //TODO: might change ebcause it looks like finishing during load testing
     telFile.clear();
     telFile.seekg(0);
     Sleep(1);
@@ -215,6 +210,9 @@ while (connectionOK)
             break;
         }
         ++linesSent;
+
+        
+        Sleep(1);
     }
 }
 
@@ -224,6 +222,7 @@ while (connectionOK)
         TelemetryPacket eofPkt{};
         eofPkt.clientID = clientID;
         eofPkt.isEOF = 1;
+
         // reuse the last valid timestamp / fuel value already in pkt context
         // the server ignores data fields when isEOF == 1.
         sendAll(sock,
