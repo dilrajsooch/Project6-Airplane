@@ -109,3 +109,146 @@ static bool sendAll(SOCKET s, const char* buf, int len)
     }
     return true;
 }
+
+
+//dil TODO
+
+int main(int argc, char* argv[])
+{
+    // CLI
+    const char* serverIP = (argc >= 2) ? argv[1] : DEFAULT_SERVER_IP;
+    const char* dataFile = (argc >= 3) ? argv[2] : "katl-kefd-B737-700.txt";
+
+    // assign unique aircraft ID 
+    uint32_t clientID = generateClientID();
+    std::cout << "Aircraft ID: " << clientID << "\n"
+        << "Server:      " << serverIP << ":" << SERVER_PORT << "\n"
+        << "Data file:   " << dataFile << "\n\n";
+
+    // Open telemetry file 
+    std::ifstream telFile(dataFile);
+    if (!telFile.is_open())
+    {
+        std::cerr << "ERROR: Cannot open telemetry file: " << dataFile << "\n";
+        return 1;
+    }
+
+    // init connection
+    WSADATA wsa;
+    if (WSAStartup(MAKEWORD(2, 2), &wsa) != 0)
+    {
+        std::cerr << "WSAStartup failed: " << WSAGetLastError() << "\n";
+        return 1;
+    }
+
+    // socket init, connect to server
+    SOCKET sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    if (sock == INVALID_SOCKET)
+    {
+        std::cerr << "socket() failed: " << WSAGetLastError() << "\n";
+        WSACleanup();
+        return 1;
+    }
+
+    sockaddr_in serverAddr{};
+    serverAddr.sin_family = AF_INET;
+    serverAddr.sin_port = htons(SERVER_PORT);
+    if (inet_pton(AF_INET, serverIP, &serverAddr.sin_addr) != 1)
+    {
+        std::cerr << "Invalid server IP: " << serverIP << "\n";
+        closesocket(sock);
+        WSACleanup();
+        return 1;
+    }
+
+    if (connect(sock,
+        reinterpret_cast<sockaddr*>(&serverAddr),
+        sizeof(serverAddr)) == SOCKET_ERROR)
+    {
+        std::cerr << "connect() failed: " << WSAGetLastError() << "\n";
+        closesocket(sock);
+        WSACleanup();
+        return 1;
+    }
+
+    std::cout << "Connected to server.\n";
+
+    // read, put in packet and transmit until EOF 
+    std::string line;
+uint64_t    linesSent = 0;
+uint64_t    linesSkipped = 0;
+bool        connectionOK = true;
+
+while (connectionOK)
+{
+    // rewind to start of file for each loop it
+    //TODO: might change ebcause it looks like finishing during load testing
+    telFile.clear();
+    telFile.seekg(0);
+    Sleep(1);
+
+    while (std::getline(telFile, line) && connectionOK)
+    {
+        TelemetryPacket pkt{};
+        float fuel = 0.0f;
+
+        // read while parse
+        if (!parseLine(line, pkt.timestamp, fuel))
+        {
+            ++linesSkipped;
+            continue;
+        }
+
+        // packet
+        pkt.clientID = clientID;
+        pkt.fuelRemaining = fuel;
+        pkt.isEOF = 0;
+
+        // transmit
+        if (!sendAll(sock,
+            reinterpret_cast<const char*>(&pkt),
+            static_cast<int>(sizeof(pkt))))
+        {
+            std::cerr << "Send failed on line "
+                << (linesSent + linesSkipped + 1) << "\n";
+            connectionOK = false;
+            break;
+        }
+        ++linesSent;
+    }
+}
+
+    //  Send EOF alert so the server can calculate the flight average
+    if (connectionOK)
+    {
+        TelemetryPacket eofPkt{};
+        eofPkt.clientID = clientID;
+        eofPkt.isEOF = 1;
+        // reuse the last valid timestamp / fuel value already in pkt context
+        // the server ignores data fields when isEOF == 1.
+        sendAll(sock,
+            reinterpret_cast<const char*>(&eofPkt),
+            static_cast<int>(sizeof(eofPkt)));
+    }
+
+    // clean/close
+    std::cout << "Flight complete. Lines sent: " << linesSent
+        << " | Skipped: " << linesSkipped << "\n";
+
+    closesocket(sock);
+    WSACleanup();
+    return 0;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
