@@ -17,7 +17,14 @@
 #include "Common.h"
 
 
-// Unique ID Generation 
+/**
+ * @brief Generate a unique non-zero client (aircraft) ID.
+ *
+ * Seeds the C random generator from the current time and process ID,
+ * then assembles a 32-bit identifier from two rand() calls.
+ *
+ * @return A non-zero 32-bit unique client identifier.
+ */
 static uint32_t generateClientID()
 {
     uint32_t seed = static_cast<uint32_t>(std::time(nullptr))
@@ -30,18 +37,17 @@ static uint32_t generateClientID()
     return id;
 }
 
-//Telemetry File Parser
-/*
-    Parse one line of a telemetry data file.
- 
-    Two line formats are handled:
-    Header:"FUEL TOTAL QUANTITY,D_M_YYYY HH:MM:SS,fuel,"
-    Data:  D_M_YYYY HH:MM:SS,fuel,"
- 
-    Output: null-terminated timestamp string.
-    Output: fuel quantity (gallons).
-    Return true on success, false if the line could not be parsed.
-
+/**
+ * @brief Parse one line of a telemetry data file.
+ *
+ * Two line formats are handled:
+ *  - Header: "FUEL TOTAL QUANTITY,D_M_YYYY HH:MM:SS,fuel,"
+ *  - Data:   "D_M_YYYY HH:MM:SS,fuel,"
+ *
+ * @param[in]  line    Raw line read from the telemetry file.
+ * @param[out] outTS   Null-terminated timestamp string (fixed-size buffer).
+ * @param[out] outFuel Parsed fuel quantity in gallons.
+ * @return true on success, false if the line could not be parsed.
  */
 static bool parseLine(const std::string& line,
     char               outTS[TIMESTAMP_LEN],
@@ -90,11 +96,15 @@ static bool parseLine(const std::string& line,
     return true;
 }
 
-//Reliable Send
-
-/*
-    Send all bytes in the buffer, looping until complete.
-    @return true on success, false if the connection was lost.
+/**
+ * @brief Reliably send all bytes in a buffer over a TCP socket.
+ *
+ * Loops on send() until the full length has been transmitted.
+ *
+ * @param s   Connected TCP socket.
+ * @param buf Pointer to the data buffer.
+ * @param len Number of bytes to send.
+ * @return true on success, false if the connection was lost.
  */
 static bool sendAll(SOCKET s, const char* buf, int len)
 {
@@ -109,6 +119,17 @@ static bool sendAll(SOCKET s, const char* buf, int len)
     return true;
 }
 
+/**
+ * @brief Client entry point.
+ *
+ * Opens the telemetry file, connects to the server, then streams
+ * every parsed sample as a TelemetryPacket. A final packet with
+ * @c isEOF=1 is sent so the server can finalise the flight average.
+ *
+ * @param argc Argument count.
+ * @param argv argv[1] = server IP (optional), argv[2] = data-file path (optional).
+ * @return 0 on success, non-zero on failure.
+ */
 int main(int argc, char* argv[])
 {
     // CLI

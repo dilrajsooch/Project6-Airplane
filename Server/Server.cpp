@@ -29,7 +29,12 @@
 
 #include "Common.h"
 
- //Flight Record
+/**
+ * @brief Per-aircraft flight record used by the server.
+ *
+ * Tracks the current flight's running fuel-consumption totals as well
+ * as lifetime aggregates across every flight observed for this aircraft.
+ */
 struct FlightRecord
 {
     uint32_t    aircraftID = 0;
@@ -53,12 +58,17 @@ static std::mutex              g_fleetMutex;
 static std::map<uint32_t, FlightRecord> g_fleet;
 static std::atomic<bool>       g_running(true);
 
-//Logging helpers
+static std::mutex  g_logMutex;      ///< Serialises access to stdout and the log file.
+static std::ofstream g_logFile;     ///< Optional append-only log file.
 
-//Thread-safe console + optional log-file output.
-static std::mutex  g_logMutex;
-static std::ofstream g_logFile;
-
+/**
+ * @brief Thread-safe timestamped log line to console and log file.
+ *
+ * Prepends the current local time (HH:MM:SS) to @p msg and writes the
+ * resulting line to both @c std::cout and, if open, @c g_logFile.
+ *
+ * @param msg Message to log.
+ */
 static void log(const std::string& msg)
 {
     std::time_t now = std::time(nullptr);
@@ -71,7 +81,15 @@ static void log(const std::string& msg)
         g_logFile << "[" << tbuf << "] " << msg << "\n";
 }
 
-//Fleet Report
+/**
+ * @brief Append a completed flight's averages to @c fleet_averages.csv.
+ *
+ * Writes the CSV header on first use, then appends a row containing the
+ * aircraft ID, flight number, per-flight GPH and lifetime GPH. Protected
+ * by a static mutex so concurrent client threads can't interleave writes.
+ *
+ * @param rec The finalised flight record to persist.
+ */
 static void saveFinalAverage(const FlightRecord& rec)
 {
     static std::mutex csvMutex;
@@ -104,7 +122,20 @@ static void saveFinalAverage(const FlightRecord& rec)
         << rec.totalFlights << "\n";
 }
 
-//Per-Client Thread
+/**
+ * @brief Worker thread handling a single client connection.
+ *
+ * Receives TelemetryPacket frames in a loop, updates the aircraft's
+ * running fuel-consumption record, and — when the EOF packet arrives
+ * or the connection drops — finalises the flight average and writes
+ * it to the CSV via saveFinalAverage().
+ *
+ * Satisfies SYS-001 (one thread per client), SYS-010 (per-sample
+ * consumption update), SYS-020 (final average on flight-end) and
+ * SYS-030 (aircraft identified by per-packet ID).
+ *
+ * @param clientSocket Connected client socket; closed before return.
+ */
 static void clientThread(SOCKET clientSocket)
 {
     // Enable TCP keep-alive so we detect abruptly-crashed clients.
@@ -244,7 +275,17 @@ done:
     saveFinalAverage(rec);
 }
 
-//main
+/**
+ * @brief Server entry point.
+ *
+ * Initialises Winsock, opens the log file, binds a listening socket
+ * on the configured port, and accepts incoming connections in a loop.
+ * Each accepted connection is handed to a detached clientThread().
+ *
+ * @param argc Argument count.
+ * @param argv argv[1] = listening port (optional; defaults to SERVER_PORT).
+ * @return 0 on success, non-zero on failure.
+ */
 int main(int argc, char* argv[])
 {
     int port = SERVER_PORT;

@@ -40,12 +40,15 @@ struct TelemetryPacket
 };
 #pragma pack(pop)
 
-/* 
-*   Convert a telemetry timestamp string to a POSIX time_t.
-*   Handles the format produced by the data files:
-* @param ts  Null-terminated timestamp string.
-* @return   Corresponding time_t, or (time_t)-1 on parse failure.
-*/
+/**
+ * @brief Convert a telemetry timestamp string to a POSIX time_t.
+ *
+ * Handles the format produced by the data files:
+ *   "D_M_YYYY HH:MM:SS"  (e.g. "12_3_2023 14:56:47")
+ *
+ * @param ts  Null-terminated timestamp string.
+ * @return    Corresponding time_t, or (time_t)-1 on parse failure.
+ */
 inline time_t parseTimestamp(const char* ts)
 {
     int p1 = 0, p2 = 0, year = 0, hour = 0, min = 0, sec = 0;
