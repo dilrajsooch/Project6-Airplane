@@ -29,3 +29,13 @@
 // Packet Layout 
 #define TIMESTAMP_LEN       32             
 
+// Wire-format packet transmitted from client to server.
+#pragma pack(push, 1)
+struct TelemetryPacket
+{
+    uint32_t clientID;              
+    char     timestamp[TIMESTAMP_LEN]; 
+    float    fuelRemaining;         
+    uint8_t  isEOF;                 
+};
+#pragma pack(pop)
