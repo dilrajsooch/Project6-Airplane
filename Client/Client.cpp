@@ -196,12 +196,9 @@ uint64_t    linesSent = 0;
 uint64_t    linesSkipped = 0;
 bool        connectionOK = true;
 
-while (connectionOK)
-{
     // rewind to start of file for each loop it
     telFile.clear();
     telFile.seekg(0);
-    Sleep(1);
 
     while (std::getline(telFile, line) && connectionOK)
     {
@@ -235,7 +232,6 @@ while (connectionOK)
         
         Sleep(1);
     }
-}
 
     //  Send EOF alert so the server can calculate the flight average
     if (connectionOK)
